@@ -237,7 +237,7 @@ namespace PKHeX.Core.AutoMod
                 (ushort)Species.Arceus => generation != 4 || form < 9 ? SimpleEdits.GetArceusHeldItemFromForm(form) : SimpleEdits.GetArceusHeldItemFromForm(form - 1),
                 (ushort)Species.Silvally => SimpleEdits.GetSilvallyHeldItemFromForm(form),
                 (ushort)Species.Genesect => SimpleEdits.GetGenesectHeldItemFromForm(form),
-                (ushort)Species.Giratina => form == 1 ? 112 : null, // Griseous Orb
+                (ushort)Species.Giratina => form == 1 ? 1779 : null, // Griseous Core
                 (ushort)Species.Zacian => form == 1 ? 1103 : null, // Rusted Sword
                 (ushort)Species.Zamazenta => form == 1 ? 1104 : null, // Rusted Shield
                 _ => null
