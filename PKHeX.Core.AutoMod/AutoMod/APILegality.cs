@@ -148,10 +148,6 @@ namespace PKHeX.Core.AutoMod
                     return pk;
                 }
 
-                //Other balls for unreleased 7-star raids are not yet whitelisted
-                if ((Species)pk.Species is Species.Grookey or Species.Thwackey or Species.Rillaboom)
-                    pk.Ball = (int)Ball.Poke;
-
                 // Verify the Legality of what we generated, and exit if it is valid.
                 var la = new LegalityAnalysis(pk);
                 if (la.Valid)
@@ -791,22 +787,18 @@ namespace PKHeX.Core.AutoMod
         /// <param name="set">Set to pass in requested IVs</param>
         private static void PreSetPIDIV(this PKM pk, IEncounterable enc, IBattleTemplate set)
         {
-            if (enc is EncounterTera9 tera)
+            if (enc is ITeraRaid9)
             {
                 var pk9 = (PK9)pk;
-                FindTeraPIDIV(pk9, tera, set);
+                switch (enc)
+                {
+                    case EncounterTera9 tera: FindTeraPIDIV(pk9, tera, set); break;
+                    case EncounterDist9 dist: FindTeraPIDIV(pk9, dist, set); break;
+                    case EncounterMight9 might: FindTeraPIDIV(pk9, might, set); break;
+                }
                 if (set.TeraType != MoveType.Any && set.TeraType != pk9.TeraType)
                     pk9.SetTeraType(set.TeraType);
             }
-
-            if (enc is EncounterDist9 dist && (Species)dist.Species is Species.Gimmighoul)
-            {
-                var pk9 = (PK9)pk;
-                FindTeraPIDIV(pk9, dist, set);
-                if (set.TeraType != MoveType.Any && set.TeraType != pk9.TeraType)
-                    pk9.SetTeraType(set.TeraType);
-            }
-
             if (enc is EncounterStatic8N or EncounterStatic8NC or EncounterStatic8ND or EncounterStatic8U)
             {
                 var e = (EncounterStatic)enc;
@@ -907,34 +899,17 @@ namespace PKHeX.Core.AutoMod
                 ulong seed = GetRandomULong();
                 const byte rollCount = 1;
                 const byte undefinedSize = 0;
-                var pi = PersonalTable.SV.GetFormEntry(pk.Species, pk.Form);
-                var param = new GenerateParam9(pk.Species, pi.Gender, enc.FlawlessIVCount, rollCount,
-                    undefinedSize, undefinedSize, undefinedSize, undefinedSize,
-                    enc.Ability, enc.Shiny);
-                enc.TryApply32(pk, seed, param, EncounterCriteria.Unrestricted);
-                if (IsMatchCriteria9(pk, set, compromise))
-                    break;
-                if (count == 5_000)
-                    compromise = true;
-            } while (++count < 15_000);
-        }
-
-        private static void FindTeraPIDIV(PK9 pk, EncounterDist9 enc, IBattleTemplate set)
-        {
-            if (IsMatchCriteria9(pk, set))
-                return;
-
-            var count = 0;
-            var compromise = false;
-            do
-            {
-                ulong seed = GetRandomULong();
-                const byte rollCount = 1;
-                const byte undefinedSize = 0;
-                var pi = PersonalTable.SV.GetFormEntry(pk.Species, pk.Form);
-                var param = new GenerateParam9(pk.Species, pi.Gender, enc.FlawlessIVCount, rollCount,
-                    undefinedSize, undefinedSize, undefinedSize, undefinedSize,
-                    enc.Ability, enc.Shiny);
+                var pi = PersonalTable.SV.GetFormEntry(enc.Species, enc.Form);
+                var param = enc switch
+                {
+                    EncounterDist9 dist => new GenerateParam9(pk.Species, pi.Gender, dist.FlawlessIVCount, rollCount,
+                        undefinedSize, undefinedSize, dist.ScaleType, dist.Scale, dist.Ability, dist.Shiny, dist.Nature, dist.IVs),
+                    EncounterMight9 might => new GenerateParam9(pk.Species, might.GetGender(), might.FlawlessIVCount, rollCount,
+                        undefinedSize, undefinedSize, might.ScaleType, might.Scale, might.Ability, might.Shiny, might.Nature, might.IVs),
+                    _ => new GenerateParam9(pk.Species, pi.Gender, enc.FlawlessIVCount, rollCount,
+                        undefinedSize, undefinedSize, undefinedSize, undefinedSize,
+                        enc.Ability, enc.Shiny),
+                };
                 enc.TryApply32(pk, seed, param, EncounterCriteria.Unrestricted);
                 if (IsMatchCriteria9(pk, set, compromise))
                     break;
