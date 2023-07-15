@@ -698,7 +698,7 @@ namespace PKHeX.Core.AutoMod
                 if (moves.Length != 0)
                     tr.SetRecordFlags(moves);
                 else
-                    tr.SetRecordFlags();
+                    tr.SetRecordFlagsAll();
                 return;
             }
 

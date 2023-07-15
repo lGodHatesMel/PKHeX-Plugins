@@ -902,11 +902,11 @@ namespace PKHeX.Core.AutoMod
                 var pi = PersonalTable.SV.GetFormEntry(enc.Species, enc.Form);
                 var param = enc switch
                 {
-                    EncounterDist9 dist => new GenerateParam9(pk.Species, pi.Gender, dist.FlawlessIVCount, rollCount,
+                    EncounterDist9 dist => new GenerateParam9(dist.Species, pi.Gender, dist.FlawlessIVCount, rollCount,
                         undefinedSize, undefinedSize, dist.ScaleType, dist.Scale, dist.Ability, dist.Shiny, dist.Nature, dist.IVs),
-                    EncounterMight9 might => new GenerateParam9(pk.Species, might.GetGender(), might.FlawlessIVCount, rollCount,
+                    EncounterMight9 might => new GenerateParam9(might.Species, might.GetGender(), might.FlawlessIVCount, rollCount,
                         undefinedSize, undefinedSize, might.ScaleType, might.Scale, might.Ability, might.Shiny, might.Nature, might.IVs),
-                    _ => new GenerateParam9(pk.Species, pi.Gender, enc.FlawlessIVCount, rollCount,
+                    _ => new GenerateParam9(enc.Species, pi.Gender, enc.FlawlessIVCount, rollCount,
                         undefinedSize, undefinedSize, undefinedSize, undefinedSize,
                         enc.Ability, enc.Shiny),
                 };
