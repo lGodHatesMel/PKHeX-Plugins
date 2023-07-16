@@ -698,7 +698,14 @@ namespace PKHeX.Core.AutoMod
                 if (moves.Length != 0)
                     tr.SetRecordFlags(moves);
                 else
-                    tr.SetRecordFlagsAll();
+                {
+                    var permit = tr.Permit;
+                    for (int i = 0; i < permit.RecordCountUsed; i++)
+                    {
+                        if (permit.IsRecordPermitted(i))
+                            tr.SetMoveRecordFlag(i);
+                    }
+                }
                 return;
             }
 
