@@ -792,19 +792,13 @@ namespace PKHeX.Core.AutoMod
         /// <param name="set">Set to pass in requested IVs</param>
         private static void PreSetPIDIV(this PKM pk, IEncounterable enc, IBattleTemplate set)
         {
-            if (enc is ITeraRaid9)
+            if (enc is EncounterTera9 tera)
             {
                 var pk9 = (PK9)pk;
-                switch (enc)
-                {
-                    case EncounterTera9 tera: FindTeraPIDIV(pk9, tera, set); break;
-                    case EncounterDist9 dist: FindTeraPIDIV(pk9, dist, set); break;
-                    case EncounterMight9 might: FindTeraPIDIV(pk9, might, set); break;
-                }
+                FindTeraPIDIV(pk9, tera, set);
                 if (set.TeraType != MoveType.Any && set.TeraType != pk9.TeraType)
                     pk9.SetTeraType(set.TeraType);
             }
-
             if (enc is EncounterDist9 dist)
             {
                 var pk9 = (PK9)pk;
@@ -819,7 +813,6 @@ namespace PKHeX.Core.AutoMod
                 if (set.TeraType != MoveType.Any && set.TeraType != pk9.TeraType)
                     pk9.SetTeraType(set.TeraType);
             }
-
             if (enc is EncounterStatic8N or EncounterStatic8NC or EncounterStatic8ND or EncounterStatic8U)
             {
                 var e = (EncounterStatic)enc;
@@ -908,7 +901,6 @@ namespace PKHeX.Core.AutoMod
         }
 
         private static void FindTeraPIDIV(PK9 pk, EncounterStatic enc, IBattleTemplate set)
-            where T : EncounterStatic, ITeraRaid9
         {
             if (IsMatchCriteria9(pk, set))
                 return;
