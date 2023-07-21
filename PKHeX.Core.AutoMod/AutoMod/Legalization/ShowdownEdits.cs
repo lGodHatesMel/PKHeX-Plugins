@@ -140,7 +140,8 @@ namespace PKHeX.Core.AutoMod
                 }
             }
 
-            pk.SetSuggestedFormArgument(enc.Species);
+            if(pk is IFormArgument)
+                pk.SetSuggestedFormArgument(enc.Species);
             if (evolutionRequired)
                 pk.RefreshAbility(pk.AbilityNumber >> 1);
 
@@ -278,6 +279,10 @@ namespace PKHeX.Core.AutoMod
                 pk.ClearRelearnMoves();
                 pk.SetRelearnMoves(moves);
             }
+
+            la = new LegalityAnalysis(pk);
+            if (la.Info.Relearn.Any(z => z.Judgement == Severity.Invalid))
+                pk.ClearRelearnMoves();
 
             if (pk is IAwakened)
             {
