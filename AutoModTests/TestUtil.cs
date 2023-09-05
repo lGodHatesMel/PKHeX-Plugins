@@ -18,9 +18,9 @@ namespace AutoModTests
                 if (Initialized)
                     return;
 
-                if (EncounterEvent.MGDB_G3.Length == 0)
-                    EncounterEvent.RefreshMGDB();
-
+                // if (EncounterEvent.MGDB_G3.Length == 0)
+                //     EncounterEvent.RefreshMGDB();
+                EncounterEvent.RefreshMGDB();
                 RibbonStrings.ResetDictionary(GameInfo.Strings.ribbons);
                 Legalizer.EnableEasterEggs = false;
                 APILegality.SetAllLegalRibbons = false;
