@@ -1,7 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <PackageReference Include="PKHeX.Core" Version="23.8.23" />
+    <Folder Include="deps\" />
   </ItemGroup>
+
+  <ItemGroup>
+		<Reference Include="PKHeX.Core">
+			<HintPath>deps\PKHeX.Core.dll</HintPath>
+		</Reference>
+	</ItemGroup>
 
 </Project>

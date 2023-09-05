@@ -16,7 +16,7 @@ namespace PKHeX.Core.AutoMod
         /// </summary>
         /// <param name="pk">PKM whose gender needs to be toggled</param>
         /// <param name="set">Showdown Set for Gender reference</param>
-        public static void FixGender(this PKM pk, IBattleTemplate set)
+        public static void FixGender(this PKM pk, IEncounterable enc, IBattleTemplate set)
         {
             pk.ApplySetGender(set);
             var la = new LegalityAnalysis(pk);
@@ -26,7 +26,8 @@ namespace PKHeX.Core.AutoMod
 
             if (Report.Contains(LegalityCheckStrings.LPIDGenderMismatch))
                 pk.Gender = pk.Gender == 0 ? 1 : 0;
-
+            if (enc is IFixedGender { IsFixedGender: true } fg)
+                pk.Gender = fg.Gender;
             if (pk.Gender is not 0 and not 1)
                 pk.Gender = pk.GetSaneGender();
         }
@@ -110,11 +111,10 @@ namespace PKHeX.Core.AutoMod
         /// <param name="Form">Form to apply</param>
         /// <param name="enc">Encounter detail</param>
         /// <param name="lang">Language to apply</param>
-        public static void SetSpeciesLevel(this PKM pk, IBattleTemplate set, byte Form, IEncounterable enc, LanguageID? lang = null)
+        public static void SetSpeciesLevel(this PKM pk, IBattleTemplate set, byte Form, IEncounterable enc,ITrainerInfo handler, LanguageID? lang = null)
         {
             pk.ApplySetGender(set);
             pk.SetRecordFlags(set.Moves); // Set record flags before evolution (TODO: what if middle evolution has exclusive record moves??)
-
             var evolutionRequired = pk.Species != set.Species;
             var formchange = Form != pk.Form;
             if (evolutionRequired)
@@ -143,13 +143,12 @@ namespace PKHeX.Core.AutoMod
             pk.SetSuggestedFormArgument(enc.Species);
             if (evolutionRequired)
                 pk.RefreshAbility(pk.AbilityNumber >> 1);
-
-            pk.CurrentLevel = set.Level;
+            if(pk.CurrentLevel!=set.Level)
+                pk.CurrentLevel = set.Level;
             if (pk.Met_Level > pk.CurrentLevel)
                 pk.Met_Level = pk.CurrentLevel;
             if (set.Level != 100 && set.Level == enc.LevelMin && pk.Format is 3 or 4)
                 pk.EXP = Experience.GetEXP(enc.LevelMin + 1, PersonalTable.HGSS[enc.Species].EXPGrowth) - 1;
-
             var currentlang = (LanguageID)pk.Language;
             var finallang = lang ?? currentlang;
             if (finallang == LanguageID.Hacked)
@@ -164,6 +163,7 @@ namespace PKHeX.Core.AutoMod
             {
                 // Set this before hand incase it is true. Will early return if it is also IFixedNickname
                 // Wait for PKHeX to expose this instead of using reflection
+
             }
             // don't bother checking encountertrade nicknames for length validity
             if (enc is IFixedNickname { IsFixedNickname: true } et)
@@ -171,11 +171,14 @@ namespace PKHeX.Core.AutoMod
                 // Nickname matches the requested nickname already
                 if (pk.Nickname == set.Nickname)
                     return;
-                // This should be illegal except Meister Magikarp in BDSP, however trust the user and set corresponding OT
+
                 var nick = et.GetNickname(pk.Language);
+                //Meister Magikarp's nickname is based on the save language instead of the pk language
+                if (enc is EncounterTrade8b {Species:(int)Species.Magikarp })
+                    nick = et.GetNickname(handler.Language);
                 if (nick != null)
                 {
-                    pk.Nickname = nick;
+                    pk.SetNickname(nick);
                     return;
                 }
             }
@@ -307,11 +310,6 @@ namespace PKHeX.Core.AutoMod
         /// <param name="pk">Pokemon to modify</param>
         public static void SetEncounterTradeIVs(this IEncounterable t, PKM pk)
         {
-            if (t is EncounterTrade3 { IVs.IsSpecified: true } et3)
-                pk.SetRandomIVsTemplate(et3.IVs, 0);
-            else if (t is EncounterTrade4PID { IVs.IsSpecified: true } et4p)
-                pk.SetRandomIVsTemplate(et4p.IVs, 0);
-            else
                 pk.SetRandomIVs(minFlawless: 3);
         }
 
@@ -368,6 +366,30 @@ namespace PKHeX.Core.AutoMod
                     pk.HeldItem = 1778;
                     break;
             }
+        }
+
+        /// <summary>
+        /// Randomizes the IVs within game constraints.
+        /// </summary>
+        /// <param name="template">IV template to generate from</param>
+        /// <param name="minFlawless">Count of flawless IVs to set. If none provided, a count will be detected.</param>
+        /// <returns>Randomized IVs if desired.</returns>
+        private static void SetRandomIVsTemplate(this PKM pk, IndividualValueSet template, int minFlawless = 0)
+        {
+            Span<int> ivs = stackalloc int[6];
+            var rnd = Util.Rand;
+            do
+            {
+                for (int i = 0; i < 6; i++)
+                    ivs[i] = template[i] < 0 ? rnd.Next(31 + 1) : template[i];
+            } while (ivs.Count(31) < minFlawless);
+
+            pk.IV_HP = ivs[0];
+            pk.IV_ATK = ivs[1];
+            pk.IV_DEF = ivs[2];
+            pk.IV_SPE = ivs[3];
+            pk.IV_SPA = ivs[4];
+            pk.IV_SPD = ivs[5];
         }
     }
 }

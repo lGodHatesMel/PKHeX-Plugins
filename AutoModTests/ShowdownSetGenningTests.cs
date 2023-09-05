@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using PKHeX.Core;
 using PKHeX.Core.AutoMod;
+using System.Diagnostics;
 using Xunit;
 
 namespace AutoModTests
@@ -13,6 +14,7 @@ namespace AutoModTests
         [InlineData(GameVersion.US, Meowstic)]
         [InlineData(GameVersion.US, Darkrai)]
         [InlineData(GameVersion.B2, Genesect)]
+        [InlineData(GameVersion.SW, problemsolving)]
         public static void VerifyManually(GameVersion game, string txt)
         {
             var dev = APILegality.EnableDevMode;
@@ -29,9 +31,14 @@ namespace AutoModTests
             APILegality.EnableDevMode = dev;
 
             var la = new LegalityAnalysis(pkm);
+            if (!la.Valid)
+                Debug.WriteLine(la.Report() + "\n");
             la.Valid.Should().BeTrue();
         }
-
+        private const string problemsolving =
+            @"Stakataka
+IVs: 17 Def / 0 Spe
+Lonely Nature";
         private const string Darkrai =
 @"Darkrai
 IVs: 7 Atk

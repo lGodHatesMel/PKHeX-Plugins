@@ -161,8 +161,8 @@ namespace PKHeX.Core.AutoMod
                 pk.PID = pidxor ? ec ^ 0x80000000 : ec;
                 return;
             }
-            int wIndex = WurmpleUtil.GetWurmpleEvoGroup(pk.Species);
-            if (wIndex != -1)
+            var wIndex = WurmpleUtil.GetWurmpleEvoGroup(pk.Species);
+            if (wIndex != WurmpleEvolution.None)
             {
                 pk.EncryptionConstant = WurmpleUtil.GetWurmpleEncryptionConstant(wIndex);
                 return;
@@ -485,6 +485,15 @@ namespace PKHeX.Core.AutoMod
         {
             switch (pk)
             {
+                case PK9 pk9 when !pk.IsUntraded:
+                    pk9.ClearMemoriesHT();
+                    break;
+                case PA8 pa8 when !pk.IsUntraded:
+                    pa8.ClearMemoriesHT();
+                    break;
+                case PB8 pb8 when !pk.IsUntraded:
+                    pb8.ClearMemoriesHT();
+                    break;
                 case PK8 pk8 when !pk.IsUntraded:
                     pk8.SetTradeMemoryHT8();
                     break;
