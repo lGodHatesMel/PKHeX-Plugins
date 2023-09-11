@@ -94,15 +94,24 @@ namespace PKHeX.Core.AutoMod
                 }
 
                 // Look before we leap -- don't waste time generating invalid / incompatible junk.
-               if (!IsEncounterValid(set, enc, abilityreq, destVer))
-                   continue;
+                if (!IsEncounterValid(set, enc, abilityreq, destVer))
+                    continue;
 
-               if (enc is IFixedNature { IsFixedNature: true } fixedNature)
-                   criteria = criteria with { Nature = Nature.Random };
-                criteria = SetSpecialCriteria(criteria,enc, set);
+                if (enc is IFixedNature { IsFixedNature: true } fixedNature)
+                    criteria = criteria with { Nature = Nature.Random };
+                criteria = SetSpecialCriteria(criteria, enc, set);
                 // Create the PKM from the template.
                 var tr = SimpleEdits.IsUntradeableEncounter(enc) ? dest : GetTrainer(regen, enc.Version, enc.Generation);
                 var raw = enc.ConvertToPKM(tr, criteria);
+
+                // If the encounter is a Wurmple, we need to make sure the evolution is correct.
+                if (enc.Species == (int)Species.Wurmple && set.Species != (int)Species.Wurmple)
+                {
+                    var wdest = WurmpleUtil.GetWurmpleEvoGroup(set.Species);
+                    while (WurmpleUtil.GetWurmpleEvoVal(raw.PID) != wdest)
+                        raw = enc.ConvertToPKM(tr, criteria);
+                }
+
                 if (raw.OT_Name.Length == 0)
                 {
                     raw.Language = tr.Language;
@@ -116,14 +125,14 @@ namespace PKHeX.Core.AutoMod
 
                 // Transfer any VC1 via VC2, as there may be GSC exclusive moves requested.
                 if (dest.Generation >= 7 && raw is PK1 basepk1)
-                   raw = basepk1.ConvertToPK2();
+                    raw = basepk1.ConvertToPK2();
 
-                if (enc is EncounterTrade8b { Species: (ushort)Species.Magikarp})
+                if (enc is EncounterTrade8b { Species: (ushort)Species.Magikarp })
                 {
                     tr = set.Nickname switch
                     {
                         "ポッちゃん" => SaveUtil.GetBlankSAV(tr.Context, tr.OT, LanguageID.Japanese),
-                        "Bloupi" => SaveUtil.GetBlankSAV(tr.Context,tr.OT, LanguageID.French),
+                        "Bloupi" => SaveUtil.GetBlankSAV(tr.Context, tr.OT, LanguageID.French),
                         "Mossy" => SaveUtil.GetBlankSAV(tr.Context, tr.OT, LanguageID.Italian),
                         "Pador" => SaveUtil.GetBlankSAV(tr.Context, tr.OT, LanguageID.German),
                         _ => SaveUtil.GetBlankSAV(tr.Context, tr.OT, LanguageID.English)
@@ -185,20 +194,9 @@ namespace PKHeX.Core.AutoMod
 
         private static IEnumerable<IEncounterable> GetAllEncounters(PKM pk, ReadOnlyMemory<ushort> moves, IReadOnlyList<GameVersion> vers)
         {
-            var empty = new ReadOnlyMemory<ushort>(new ushort[] { });
-            var old_encs = new HashSet<IEncounterable>();
             var orig_encs = EncounterMovesetGenerator.GenerateEncounters(pk, moves, vers);
-            var all_encs = EncounterMovesetGenerator.GenerateEncounters(pk, empty, vers);
             foreach (var enc in orig_encs)
-            {
-                old_encs.Add(enc);
                 yield return enc;
-            }
-            foreach (var enc in all_encs)
-            {
-                if (!old_encs.Contains(enc))
-                   yield return enc;
-            }
             var pi = pk.PersonalInfo;
             var orig_form = pk.Form;
             var fc = pi.FormCount;
@@ -216,7 +214,7 @@ namespace PKHeX.Core.AutoMod
                     continue;
                 pk.Form = f;
                 pk.SetGender(pk.GetSaneGender());
-                var encs = EncounterMovesetGenerator.GenerateEncounters(pk, empty, vers);
+                var encs = EncounterMovesetGenerator.GenerateEncounters(pk, moves, vers);
                 foreach (var enc in encs)
                     yield return enc;
             }
@@ -295,7 +293,7 @@ namespace PKHeX.Core.AutoMod
 
                 GameVersion[] result;
                 if (value.IsValidSavedVersion())
-                    result = new GameVersion[] {value};
+                    result = new GameVersion[] { value };
                 else
                     result = GameUtil.GameVersions.Where(z => value.Contains(z)).ToArray();
 
@@ -366,7 +364,7 @@ namespace PKHeX.Core.AutoMod
         private static bool IsEncounterValid(IBattleTemplate set, IEncounterable enc, AbilityRequest abilityreq, GameVersion destVer)
         {
             // Don't process if encounter min level is higher than requested level
-            if(enc.Generation > 2)
+            if (enc.Generation > 2)
                 if (!IsRequestedLevelValid(set, enc))
                     return false;
 
@@ -531,8 +529,8 @@ namespace PKHeX.Core.AutoMod
             byte Form = set.Form;
             var language = regen.Extra.Language;
             var pidiv = MethodFinder.Analyze(pk);
-            var abilitypref = GetAbilityPreference(pk, enc);
-            pk.SetSpeciesLevel(set, Form, enc, handler,language);
+            pk.SetPINGA(set, pidiv.Type, set.HiddenPowerType, enc);
+            pk.SetSpeciesLevel(set, Form, enc, handler, language);
             pk.SetDateLocks(enc);
             pk.SetHeldItem(set);
             // Actions that do not affect set legality
@@ -542,14 +540,11 @@ namespace PKHeX.Core.AutoMod
             // Legality Fixing
             pk.SetMovesEVs(set, enc);
             pk.SetCorrectMetLevel();
-            if(enc is not EncounterStatic4Pokewalker && enc.Generation > 2)
-                pk.SetNatureAbility(set, enc, abilitypref);
-            pk.SetIVsPID(set, pidiv.Type, set.HiddenPowerType, enc);
             pk.SetGVs();
             pk.SetHyperTrainingFlags(set, enc); // Hypertrain
             pk.SetEncryptionConstant(enc);
             pk.SetShinyBoolean(set.Shiny, enc, regen.Extra.ShinyType);
-            pk.FixGender(enc,set);
+            pk.FixGender(enc, set);
             // Final tweaks
             pk.SetGimmicks(set);
             pk.SetGigantamaxFactor(set, enc);
@@ -585,15 +580,6 @@ namespace PKHeX.Core.AutoMod
                     var gv = pk.PID & 0xFF;
                     if (gv > 63 && pk.Gender == 1) // evolved from azurill after transferring to keep gender
                         genderValid = true;
-                }
-            }
-            else
-            {
-                // check for mixed->fixed gender incompatibility by checking the gender of the original species
-                if (SpeciesCategory.IsFixedGenderFromDual(pk.Species) && pk.Gender != 2) // shedinja
-                {
-                    pk.Gender = EntityGender.GetFromPID(new LegalInfo(pk, new List<CheckResult>()).EncounterMatch.Species, pk.EncryptionConstant);
-                    // genderValid = true; already true if we reach here
                 }
             }
 
@@ -754,20 +740,21 @@ namespace PKHeX.Core.AutoMod
         /// <param name="method"></param>
         /// <param name="hpType"></param>
         /// <param name="enc"></param>
-        private static void SetIVsPID(this PKM pk, IBattleTemplate set, PIDType method, int hpType, IEncounterable enc)
+        private static void SetPINGA(this PKM pk, IBattleTemplate set, PIDType method, int hpType, IEncounterable enc)
         {
+            if (enc is not EncounterStatic4Pokewalker && enc.Generation > 2)
+                ShowdownEdits.SetNature(pk, set, enc);
+
             // If PID and IV is handled in PreSetPIDIV, don't set it here again and return out
-            var hascurry = set.GetBatchValue("RibbonMarkCurry");
+            var hascurry = set.GetBatchValue(nameof(IRibbonSetMark8.RibbonMarkCurry));
             var changeec = hascurry != null && string.Equals(hascurry, "true", StringComparison.OrdinalIgnoreCase) && AllowBatchCommands;
 
             if (IsPIDIVSet(pk, enc) && !changeec)
                 return;
 
-            if (pk.Context == EntityContext.Gen8)
-            {
-                if (changeec)
-                    pk.SetRandomEC(); // break correlation
-            }
+            if (pk.Context == EntityContext.Gen8 && changeec)
+                pk.SetRandomEC(); // break correlation
+
             if (enc is MysteryGift mg)
             {
                 var ivs = pk.IVs;
@@ -778,28 +765,28 @@ namespace PKHeX.Core.AutoMod
                     return;
             }
 
-                switch (enc)
-                {
-                    case EncounterGift1 eg1: if (eg1.IVs.IsSpecified) return;break;
-                    case EncounterGift2 eg2: if(eg2.IVs.IsSpecified)return;break;
-                    case EncounterTrade2 et2: if (et2.IVs.IsSpecified) return;break;
-                    case EncounterStatic2 es2:  if (es2.IVs.IsSpecified) return;break;
-                    case EncounterTrade3 et3: if (et3.IVs.IsSpecified) return;break;
-                    case EncounterTrade4PID et4: if (et4.IVs.IsSpecified) return;break;
-                    case EncounterTrade5B2W2 et25:if (et25.IVs.IsSpecified) return;break;
-                    case EncounterTrade5BW et5: if (et5.IVs.IsSpecified) return;break;
-                    case EncounterStatic6 es6: if (es6.IVs.IsSpecified) return;break;
-                    case EncounterTrade6 et6: if (et6.IVs.IsSpecified) return;break;
-                    case EncounterStatic7 es7: if (es7.IVs.IsSpecified) return;break;
-                    case EncounterTrade7 et7: if (et7.IVs.IsSpecified) return;break;
-                    case EncounterStatic7b es7b: if (es7b.IVs.IsSpecified) return;break;
-                    case EncounterTrade7b et7b: if (et7b.IVs.IsSpecified) return;break;
-                    case EncounterStatic8 es8: if (es8.IVs.IsSpecified) return;break;
-                    case EncounterTrade8 et8: if (et8.IVs.IsSpecified) return;break;
-                    case EncounterTrade8b et8b:if (et8b.IVs.IsSpecified) return;break;
-                    case EncounterStatic9 es9: if(es9.IVs.IsSpecified) return;break;
-                    case EncounterTrade9 et9: if (et9.IVs.IsSpecified) return;break;
-                }
+            switch (enc)
+            {
+                case EncounterGift1 eg1: if (eg1.IVs.IsSpecified) return; break;
+                case EncounterGift2 eg2: if (eg2.IVs.IsSpecified) return; break;
+                case EncounterTrade2 et2: if (et2.IVs.IsSpecified) return; break;
+                case EncounterStatic2 es2: if (es2.IVs.IsSpecified) return; break;
+                case EncounterTrade3 et3: if (et3.IVs.IsSpecified) return; break;
+                case EncounterTrade4PID et4: if (et4.IVs.IsSpecified) return; break;
+                case EncounterTrade5B2W2 et25: if (et25.IVs.IsSpecified) return; break;
+                case EncounterTrade5BW et5: if (et5.IVs.IsSpecified) return; break;
+                case EncounterStatic6 es6: if (es6.IVs.IsSpecified) return; break;
+                case EncounterTrade6 et6: if (et6.IVs.IsSpecified) return; break;
+                case EncounterStatic7 es7: if (es7.IVs.IsSpecified) return; break;
+                case EncounterTrade7 et7: if (et7.IVs.IsSpecified) return; break;
+                case EncounterStatic7b es7b: if (es7b.IVs.IsSpecified) return; break;
+                case EncounterTrade7b et7b: if (et7b.IVs.IsSpecified) return; break;
+                case EncounterStatic8 es8: if (es8.IVs.IsSpecified) return; break;
+                case EncounterTrade8 et8: if (et8.IVs.IsSpecified) return; break;
+                case EncounterTrade8b et8b: if (et8b.IVs.IsSpecified) return; break;
+                case EncounterStatic9 es9: if (es9.IVs.IsSpecified) return; break;
+                case EncounterTrade9 et9: if (et9.IVs.IsSpecified) return; break;
+            }
 
             if (enc.Generation is not (3 or 4))
             {
@@ -816,24 +803,9 @@ namespace PKHeX.Core.AutoMod
 
             switch (enc)
             {
-                case EncounterSlot3XD es3ps:
-                    var abil = pk.PersonalInfo.AbilityCount > 0 && enc is IPersonalAbility12 a ? (a.Ability1 == pk.Ability ? 0 : 1) : 1;
-
-                    while (pk.PID % 25 != pk.Nature)
-                    {
-                        PIDGenerator.SetRandomPokeSpotPID(pk, pk.Nature, pk.Gender, abil, es3ps.SlotNumber);
-                    }
-                    return;
-                case PCD d:
-                    {
-                        if (d.Gift.PK.PID != 1)
-                            pk.PID = d.Gift.PK.PID;
-                        else if (pk.Nature != pk.PID % 25)
-                            pk.SetPIDNature(pk.Nature);
-                        return;
-                    }
+                case EncounterSlot3XD:
+                case PCD:
                 case EncounterEgg:
-                    pk.SetPIDNature(pk.Nature);
                     return;
                 // EncounterTrade4 doesn't have fixed PIDs, so don't early return
                 case EncounterTrade3:
@@ -842,7 +814,8 @@ namespace PKHeX.Core.AutoMod
                     enc.SetEncounterTradeIVs(pk);
                     return; // Fixed PID, no need to mutate
                 default:
-                    FindPIDIV(pk, method, hpType, set.Shiny, enc);
+
+                    FindPIDIV(pk, method, hpType, set.Shiny, enc,set);
                     ValidateGender(pk);
                     break;
             }
@@ -957,7 +930,7 @@ namespace PKHeX.Core.AutoMod
 
             var count = 0;
             var compromise = false;
-            var applied = true;
+            bool applied;
             do
             {
                 ulong seed = Util.Rand32();
@@ -974,14 +947,12 @@ namespace PKHeX.Core.AutoMod
                         undefinedSize, undefinedSize, undefinedSize, undefinedSize, e.Ability, e.Shiny),
                     _ => throw new NotImplementedException("Unknown ITeraRaid9 type detected"),
                 };
-               applied = enc.TryApply32(pk, seed, param, criteria);
-
-                if (IsMatchCriteria9(pk, set, criteria, compromise))
-                    break;
-                if (count == 5_000)
+                applied = enc.TryApply32(pk, seed, param, criteria);
+                if (applied)
+                    if (IsMatchCriteria9(pk, set, criteria, compromise))
+                        break;
+                if (count == 1_000)
                     compromise = true;
-                if (count == 2 && !applied)
-                    break;
             } while (++count < 15_000);
         }
 
@@ -1191,7 +1162,7 @@ namespace PKHeX.Core.AutoMod
         /// <param name="HPType">HPType INT for preserving Hidden powers</param>
         /// <param name="shiny">Only used for CHANNEL RNG type</param>
         /// <param name="enc"></param>
-        private static void FindPIDIV(PKM pk, PIDType Method, int HPType, bool shiny, IEncounterable enc)
+        private static void FindPIDIV(PKM pk, PIDType Method, int HPType, bool shiny, IEncounterable enc, IBattleTemplate set)
         {
             if (Method == PIDType.None)
             {
@@ -1213,10 +1184,17 @@ namespace PKHeX.Core.AutoMod
             }
 
             var iterPKM = pk.Clone();
+
+            if (iterPKM.Ability != set.Ability && set.Ability != -1)
+                iterPKM.SetAbility(set.Ability >> 1);
             var count = 0;
             var isWishmaker = Method == PIDType.BACD_R && shiny && enc is WC3 { OT_Name: "WISHMKR" };
+            var compromise = false;
+            var gr = pk.PersonalInfo.Gender;
             do
             {
+                if (count >= 2_500_000)
+                    compromise = true;
                 uint seed = Util.Rand32();
                 if (isWishmaker)
                 {
@@ -1226,13 +1204,15 @@ namespace PKHeX.Core.AutoMod
                 if (PokeWalkerSeedFail(seed, Method, pk, iterPKM))
                     continue;
                 PIDGenerator.SetValuesFromSeed(pk, Method, seed);
-                if (!(pk.Ability == iterPKM.Ability && pk.AbilityNumber == iterPKM.AbilityNumber && pk.Nature == iterPKM.Nature))
+                if ((pk.AbilityNumber != iterPKM.AbilityNumber && !compromise) && pk.Nature != iterPKM.Nature)
                     continue;
-                if (pk.PIDAbility != iterPKM.PIDAbility)
+                if (pk.PIDAbility != iterPKM.PIDAbility && !compromise)
                     continue;
                 if (HPType >= 0 && pk.HPType != HPType)
                     continue;
                 if (pk.PID % 25 != iterPKM.Nature) // Util.Rand32 is the way to go
+                    continue;
+                if (pk.Gender != EntityGender.GetFromPIDAndRatio(pk.PID, gr))
                     continue;
                 if (pk.Version == (int)GameVersion.CXD && Method == PIDType.CXD) // verify locks
                 {
@@ -1256,7 +1236,7 @@ namespace PKHeX.Core.AutoMod
                 if (Method == PIDType.Channel && (shiny != pk.IsShiny || pidxor))
                     continue;
                 break;
-            } while (++count < 1_000_000);
+            } while (++count < 5_000_000);
         }
 
         /// <summary>
@@ -1324,14 +1304,6 @@ namespace PKHeX.Core.AutoMod
                 _ => PIDType.None,
             };
         }
-
-        /// <summary>
-        /// Method to get preferred ability number based on the encounter. Useful for when multiple ability numbers have the same ability
-        /// </summary>
-        /// <param name="pk">pokemon</param>
-        /// <param name="enc">encounter</param>
-        /// <returns>int indicating ability preference</returns>
-        private static AbilityPermission GetAbilityPreference(PKM pk, IEncounterable enc) => enc.Ability;
 
         /// <summary>
         /// Method to get the correct met level for a pokemon. Move up the met level till all moves are legal
@@ -1426,28 +1398,32 @@ namespace PKHeX.Core.AutoMod
                 }
             }
         }
+
         ///<summary>
         /// Handle search criteria for very specific encounters
         /// </summary>
         ///
         public static EncounterCriteria SetSpecialCriteria(EncounterCriteria criteria, IEncounterable enc, IBattleTemplate set)
         {
-           
+            if (enc is EncounterStatic8U)
+                criteria = criteria with { Shiny = Shiny.Never };
 
-            switch (enc.Species)
+
+            return (Species)enc.Species switch
             {
-                case (int)Species.Kartana when criteria.Nature == Nature.Timid && criteria.IV_ATK <= 21: // Speed boosting Timid Kartana ATK IVs <= 19
-                    return criteria with { IV_HP = -1, IV_ATK = criteria.IV_ATK, IV_DEF = -1, IV_SPA = -1, IV_SPD = -1, IV_SPE = -1 };
+                Species.Kartana when criteria.Nature == Nature.Timid && criteria.IV_ATK <= 21 // Speed boosting Timid Kartana ATK IVs <= 19
+                    => criteria with { IV_HP = -1, IV_ATK = criteria.IV_ATK, IV_DEF = -1, IV_SPA = -1, IV_SPD = -1, IV_SPE = -1 },
+                
+                Species.Stakataka when criteria.Nature == Nature.Lonely && criteria.IV_DEF <= 17 // Atk boosting Lonely Stakataka DEF IVs <= 15
+                    => criteria with { IV_HP = -1, IV_ATK = -1, IV_DEF = criteria.IV_DEF, IV_SPA = -1, IV_SPD = -1, IV_SPE = criteria.IV_SPE },
 
-                case (int)Species.Stakataka when criteria.Nature == Nature.Lonely && criteria.IV_DEF <= 17: // Atk boosting Lonely Stakataka DEF IVs <= 15
-                    return criteria with { IV_HP = -1, IV_ATK = -1, IV_DEF = criteria.IV_DEF, IV_SPA = -1, IV_SPD = -1, IV_SPE = criteria.IV_SPE };
+                Species.Pyukumuku when criteria.IV_DEF == 0 && criteria.IV_SPD == 0 && (Ability)set.Ability is Ability.InnardsOut // 0 Def / 0 Spd Pyukumuku with innards out
+                    => criteria with { IV_HP = -1, IV_ATK = -1, IV_DEF = criteria.IV_DEF, IV_SPA = -1, IV_SPD = criteria.IV_SPD, IV_SPE = -1 },
 
-                case (int)Species.Pyukumuku when criteria.IV_DEF == 0 && criteria.IV_SPD == 0 && set.Ability == (int)Ability.InnardsOut : // 0 Def / 0 Spd Pyukumuku with innards out
-                    return criteria with { IV_HP = -1, IV_ATK = -1, IV_DEF = criteria.IV_DEF, IV_SPA = -1, IV_SPD = criteria.IV_SPD, IV_SPE = -1 };
-                default: break;
-            }
-            return criteria with { IV_ATK = criteria.IV_ATK == 0 ? 0 : -1, IV_DEF = -1, IV_HP = -1, IV_SPA = -1, IV_SPD = -1, IV_SPE = criteria.IV_SPE == 0 ? 0 : -1 };
+                _ => criteria with { IV_ATK = criteria.IV_ATK == 0 ? 0 : -1, IV_DEF = -1, IV_HP = -1, IV_SPA = -1, IV_SPD = -1, IV_SPE = criteria.IV_SPE == 0 ? 0 : -1 },
+            };
         }
+
         /// <summary>
         /// Handle edge case vivillon legality if the trainerdata region is invalid
         /// </summary>

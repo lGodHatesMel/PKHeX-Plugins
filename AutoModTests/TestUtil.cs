@@ -1,6 +1,6 @@
-﻿using System.IO;
-using PKHeX.Core;
+﻿using PKHeX.Core;
 using PKHeX.Core.AutoMod;
+using System.IO;
 
 namespace AutoModTests
 {
@@ -18,8 +18,6 @@ namespace AutoModTests
                 if (Initialized)
                     return;
 
-                // if (EncounterEvent.MGDB_G3.Length == 0)
-                //     EncounterEvent.RefreshMGDB();
                 EncounterEvent.RefreshMGDB();
                 RibbonStrings.ResetDictionary(GameInfo.Strings.ribbons);
                 Legalizer.EnableEasterEggs = false;

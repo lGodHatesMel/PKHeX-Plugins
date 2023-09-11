@@ -32,20 +32,7 @@ namespace PKHeX.Core.AutoMod
                 pk.Gender = pk.GetSaneGender();
         }
 
-        /// <summary>
-        /// Set Nature and Ability of the pokemon
-        /// </summary>
-        /// <param name="pk">PKM to modify</param>
-        /// <param name="set">Showdown Set to refer</param>
-        /// <param name="enc">Encounter to reference</param>
-        /// <param name="preference">Ability index (1/2/4) preferred; &lt;= 0 for any</param>
-        public static void SetNatureAbility(this PKM pk, IBattleTemplate set, IEncounterable enc, AbilityPermission preference = AbilityPermission.Any12H)
-        {
-            SetNature(pk, set, enc);
-            SetAbility(pk, set, preference);
-        }
-
-        private static void SetNature(PKM pk, IBattleTemplate set, IEncounterable enc)
+        public static void SetNature(PKM pk, IBattleTemplate set, IEncounterable enc)
         {
             if (pk.Nature == set.Nature || set.Nature == -1)
                 return;
@@ -77,11 +64,12 @@ namespace PKHeX.Core.AutoMod
                 pk.StatNature = (int)Nature.Serious;
         }
 
-        private static void SetAbility(PKM pk, IBattleTemplate set, AbilityPermission preference)
+        public static void SetAbility(PKM pk, IBattleTemplate set, AbilityPermission preference)
         {
-            if (pk.Ability != set.Ability && set.Ability != -1)
-                pk.SetAbility(set.Ability);
-
+            if (pk.Ability != set.Ability)
+                pk.RefreshAbility(pk is PK5 { HiddenAbility: true } ? 2 : pk.AbilityNumber >> 1);
+            if (pk.Ability != set.Ability && pk.Context >= EntityContext.Gen8 && set.Ability != -1)
+                pk.RefreshAbility(pk is PK5 { HiddenAbility: true } ? 2 : pk.PersonalInfo.GetIndexOfAbility(set.Ability));
             if (preference <= 0)
                 return;
 
@@ -111,7 +99,7 @@ namespace PKHeX.Core.AutoMod
         /// <param name="Form">Form to apply</param>
         /// <param name="enc">Encounter detail</param>
         /// <param name="lang">Language to apply</param>
-        public static void SetSpeciesLevel(this PKM pk, IBattleTemplate set, byte Form, IEncounterable enc,ITrainerInfo handler, LanguageID? lang = null)
+        public static void SetSpeciesLevel(this PKM pk, IBattleTemplate set, byte Form, IEncounterable enc, ITrainerInfo handler, LanguageID? lang = null)
         {
             pk.ApplySetGender(set);
             pk.SetRecordFlags(set.Moves); // Set record flags before evolution (TODO: what if middle evolution has exclusive record moves??)
@@ -141,9 +129,12 @@ namespace PKHeX.Core.AutoMod
             }
 
             pk.SetSuggestedFormArgument(enc.Species);
-            if (evolutionRequired)
-                pk.RefreshAbility(pk.AbilityNumber >> 1);
-            if(pk.CurrentLevel!=set.Level)
+            if (evolutionRequired || formchange || (pk.Ability != set.Ability && set.Ability != -1))
+            {
+                var abilitypref = enc.Ability;
+                SetAbility(pk, set, abilitypref);
+            }
+            if (pk.CurrentLevel != set.Level)
                 pk.CurrentLevel = set.Level;
             if (pk.Met_Level > pk.CurrentLevel)
                 pk.Met_Level = pk.CurrentLevel;
@@ -174,7 +165,7 @@ namespace PKHeX.Core.AutoMod
 
                 var nick = et.GetNickname(pk.Language);
                 //Meister Magikarp's nickname is based on the save language instead of the pk language
-                if (enc is EncounterTrade8b {Species:(int)Species.Magikarp })
+                if (enc is EncounterTrade8b { Species : (int)Species.Magikarp })
                     nick = et.GetNickname(handler.Language);
                 if (nick != null)
                 {
@@ -310,7 +301,7 @@ namespace PKHeX.Core.AutoMod
         /// <param name="pk">Pokemon to modify</param>
         public static void SetEncounterTradeIVs(this IEncounterable t, PKM pk)
         {
-                pk.SetRandomIVs(minFlawless: 3);
+            pk.SetRandomIVs(minFlawless: 3);
         }
 
         /// <summary>
@@ -366,30 +357,6 @@ namespace PKHeX.Core.AutoMod
                     pk.HeldItem = 1778;
                     break;
             }
-        }
-
-        /// <summary>
-        /// Randomizes the IVs within game constraints.
-        /// </summary>
-        /// <param name="template">IV template to generate from</param>
-        /// <param name="minFlawless">Count of flawless IVs to set. If none provided, a count will be detected.</param>
-        /// <returns>Randomized IVs if desired.</returns>
-        private static void SetRandomIVsTemplate(this PKM pk, IndividualValueSet template, int minFlawless = 0)
-        {
-            Span<int> ivs = stackalloc int[6];
-            var rnd = Util.Rand;
-            do
-            {
-                for (int i = 0; i < 6; i++)
-                    ivs[i] = template[i] < 0 ? rnd.Next(31 + 1) : template[i];
-            } while (ivs.Count(31) < minFlawless);
-
-            pk.IV_HP = ivs[0];
-            pk.IV_ATK = ivs[1];
-            pk.IV_DEF = ivs[2];
-            pk.IV_SPE = ivs[3];
-            pk.IV_SPA = ivs[4];
-            pk.IV_SPD = ivs[5];
         }
     }
 }

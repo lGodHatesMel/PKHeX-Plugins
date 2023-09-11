@@ -106,7 +106,7 @@ namespace PKHeX.Core.AutoMod
         /// <summary>
         /// Gets a possible Trainer Data for the provided <see cref="pk"/>.
         /// </summary>
-        /// <param name="pk">Pokémon that will receive the trainer details.</param>
+        /// <param name="pk">Pokï¿½mon that will receive the trainer details.</param>
         /// <param name="template_save">Fallback trainer data if no new parent is found.</param>
         /// <param name="lang">Language to request for</param>
         /// <returns>Parent trainer data that originates from the <see cref="PKM.Version"/>. If none found, will return the <see cref="fallback"/>.</returns>
@@ -115,7 +115,7 @@ namespace PKHeX.Core.AutoMod
             int origin = pk.Generation;
             int format = pk.Format;
             if (format != origin)
-                return GetSavedTrainerData(format, (GameVersion)template_save.Game, fallback:template_save, lang:lang);
+                return GetSavedTrainerData(format, (GameVersion)template_save.Game, fallback: template_save, lang: lang);
             return GetSavedTrainerData((GameVersion)pk.Version, origin, template_save, lang);
         }
 
