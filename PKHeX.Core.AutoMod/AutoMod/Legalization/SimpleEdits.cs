@@ -704,7 +704,9 @@ namespace PKHeX.Core.AutoMod
             if (pk is ITechRecord tr and not PA8)
             {
                 if (moves.Length != 0)
+                {
                     tr.SetRecordFlags(moves);
+                }
                 else
                 {
                     var permit = tr.Permit;
@@ -718,7 +720,7 @@ namespace PKHeX.Core.AutoMod
             }
 
             if (pk is IMoveShop8Mastery master)
-                MoveShopRecordApplicator.SetMoveShopFlags(master, pk);
+                master.SetMoveShopFlags(pk);
         }
 
         public static void SetSuggestedContestStats(this PKM pk, IEncounterable enc)

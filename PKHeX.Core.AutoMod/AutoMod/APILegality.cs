@@ -268,7 +268,7 @@ namespace PKHeX.Core.AutoMod
                            : GetPairedVersions(destVer);
 
             if (PrioritizeGame && !nativeOnly)
-                gamelist = PrioritizeGameVersion == GameVersion.Any ? PrioritizeVersion(gamelist, SimpleEdits.GetIsland(destVer)) : PrioritizeVersion(gamelist, PrioritizeGameVersion);
+                gamelist = PrioritizeGameVersion == GameVersion.Any ? PrioritizeVersion(gamelist, destVer.GetIsland()) : PrioritizeVersion(gamelist, PrioritizeGameVersion);
 
             if (template.AbilityNumber == 4 && destVer.GetGeneration() < 8)
                 gamelist = gamelist.Where(z => z.GetGeneration() is not 3 and not 4).ToArray();
@@ -364,9 +364,8 @@ namespace PKHeX.Core.AutoMod
         private static bool IsEncounterValid(IBattleTemplate set, IEncounterable enc, AbilityRequest abilityreq, GameVersion destVer)
         {
             // Don't process if encounter min level is higher than requested level
-            if (enc.Generation > 2)
-                if (!IsRequestedLevelValid(set, enc))
-                    return false;
+            if (enc.Generation > 2 && !IsRequestedLevelValid(set, enc))
+                return false;
 
             // Don't process if the ball requested is invalid
             if (!IsRequestedBallValid(set, enc))
@@ -811,7 +810,7 @@ namespace PKHeX.Core.AutoMod
                 case EncounterTrade3:
                 case EncounterTrade4PID:
                 case EncounterTrade4RanchGift:
-                    enc.SetEncounterTradeIVs(pk);
+                    ShowdownEdits.SetEncounterTradeIVs(pk);
                     return; // Fixed PID, no need to mutate
                 default:
 
@@ -948,9 +947,8 @@ namespace PKHeX.Core.AutoMod
                     _ => throw new NotImplementedException("Unknown ITeraRaid9 type detected"),
                 };
                 applied = enc.TryApply32(pk, seed, param, criteria);
-                if (applied)
-                    if (IsMatchCriteria9(pk, set, criteria, compromise))
-                        break;
+                if (applied && IsMatchCriteria9(pk, set, criteria, compromise))
+                    break;
                 if (count == 1_000)
                     compromise = true;
             } while (++count < 15_000);
@@ -1204,7 +1202,7 @@ namespace PKHeX.Core.AutoMod
                 if (PokeWalkerSeedFail(seed, Method, pk, iterPKM))
                     continue;
                 PIDGenerator.SetValuesFromSeed(pk, Method, seed);
-                if ((pk.AbilityNumber != iterPKM.AbilityNumber && !compromise) && pk.Nature != iterPKM.Nature)
+                if (pk.AbilityNumber != iterPKM.AbilityNumber && !compromise && pk.Nature != iterPKM.Nature)
                     continue;
                 if (pk.PIDAbility != iterPKM.PIDAbility && !compromise)
                     continue;

@@ -9,8 +9,6 @@ namespace PKHeX.Core.AutoMod
     /// </summary>
     public static class ShowdownEdits
     {
-        private static readonly CompareInfo CompareInfo = CultureInfo.CurrentCulture.CompareInfo;
-
         /// <summary>
         /// Quick Gender Toggle
         /// </summary>
@@ -57,8 +55,7 @@ namespace PKHeX.Core.AutoMod
             var la2 = new LegalityAnalysis(pk);
             var enc1 = la.EncounterMatch;
             var enc2 = la2.EncounterMatch;
-            if (((!ReferenceEquals(enc1, enc2) && enc1 is not EncounterEgg) ||
-                la2.Results.Any(z => (z.Identifier == CheckIdentifier.Nature || z.Identifier == CheckIdentifier.Encounter) && !z.Valid)) && enc is not EncounterEgg)
+            if (((!ReferenceEquals(enc1, enc2) && enc1 is not EncounterEgg) || la2.Results.Any(z => (z.Identifier == CheckIdentifier.Nature || z.Identifier == CheckIdentifier.Encounter) && !z.Valid)) && enc is not EncounterEgg)
                 pk.Nature = orig;
             if (pk.Format >= 8 && pk.StatNature != pk.Nature && pk.StatNature is 0 or 6 or 18 or >= 24) // Only Serious Mint for Neutral Natures
                 pk.StatNature = (int)Nature.Serious;
@@ -297,9 +294,8 @@ namespace PKHeX.Core.AutoMod
         /// <summary>
         /// Set encounter trade IVs for a specific encounter trade
         /// </summary>
-        /// <param name="t">EncounterTrade</param>
-        /// <param name="pk">Pokemon to modify</param>
-        public static void SetEncounterTradeIVs(this IEncounterable t, PKM pk)
+        /// <param name="pk">Pok�mon to modify</param>
+        public static void SetEncounterTradeIVs(PKM pk)
         {
             pk.SetRandomIVs(minFlawless: 3);
         }
